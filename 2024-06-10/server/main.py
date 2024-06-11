@@ -19,6 +19,16 @@ USERS = "users.txt"
 
 
 def read_users() -> dict:
+    """
+    Reads users from the 'database', a file on the local machine.
+    It's really just a JSON object blob keyed by user IDs and valued
+    by blobs with user data ( e.g. name, email, etc ).
+    If the file doesn't exist, returns an empty dictionary.
+    If we fail to load the JSON, we return an empty dictionary.
+    If we successfully load the blob from the file, we return it.
+    """
+    if not os.path.isfile(USERS):
+        return {}
     with open(USERS, "r") as file_handle:
         try:
             users = json.load(file_handle)
@@ -35,6 +45,10 @@ def add_user(
     phone: str | None = None,
     address: str | None = None,
 ) -> int:
+    """
+    Attempts to add a user to the 'database' given the provided input
+    arguments. Returns 200 if the addition was successful.
+    """
     users = read_users()
     with open(USERS, "w") as file_handle:
         user_id = str(uuid.uuid4())
@@ -45,13 +59,17 @@ def add_user(
             "phone": phone,
             "address": address,
         }
-        file_handle.truncate(0)
         json.dump(users, file_handle, indent=4)
     return 200
 
 
 @router.delete("/user/delete")
 def delete_user(user_id: str) -> int:
+    """
+    Attempts to delete a user with the given ID from the 'database'.
+    Returns 404 if no such user is found.
+    Returns 200 if the deletion was successful.
+    """
     users = read_users()
     user = users.get(user_id)
     if not user:
@@ -59,7 +77,6 @@ def delete_user(user_id: str) -> int:
     del users[user_id]
 
     with open(USERS, "w") as file_handle:
-        file_handle.truncate(0)
         json.dump(users, file_handle, indent=4)
     return 200
 
@@ -72,6 +89,13 @@ def update_user(
     user_email: str | None = None,
     user_phone: str | None = None,
 ) -> dict:
+    """
+    Given input arguments, attempts to update a user with the given input
+    ID. This will overwrite data: fields left null are assumed to be desired
+    to be null on the target user.
+    If no user with the provided ID is found, returns a dictionary with a
+    description of the error.
+    """
     users = read_users()
     user = users.get(user_id)
     if not user:
@@ -86,7 +110,6 @@ def update_user(
     }
 
     with open(USERS, "w") as file_handle:
-        file_handle.truncate(0)
         json.dump(users, file_handle, indent=4)
     return user
 
@@ -99,6 +122,11 @@ def get_user(
     user_email: str | None = None,
     user_phone: str | None = None,
 ) -> dict:
+    """
+    Given input arguments, attempt to retrieve a user that matches
+    all non-null arguments. If no such user is found, returns a
+    dictionary with a description of the error.
+    """
     args_map = {
         "name": user_name,
         "id": user_id,
@@ -112,30 +140,38 @@ def get_user(
             "error": f"You must provide at least one of {', '.join(args_map.keys())}"
         }
     data = read_users().values()
+    # Filter the arguments to the function to only include the ones that aren't null.
     non_null_args = {
         arg_name: arg for arg_name, arg in args_map.items() if arg is not None
     }
+    # For every user,
     for entry in data:
+        # if every input argument matches the corresponding value on the user,
         if all(
             [
                 entry[arg_name] == arg_value
                 for arg_name, arg_value in non_null_args.items()
             ]
         ):
+            # then we've found the user we're looking for, because all of our query
+            # terms matched this user.
             return entry
 
+    # If we reach here, it means that no user matched all of our input query terms.
     return {"error": f"No such user given args: {non_null_args}"}
 
 
 @router.get("/users/get")
 def list_users(limit: int = 0) -> list[dict]:
-    if not os.path.isfile(USERS):
+    """
+    List all of the users from the 'database'.
+    """
+    data = read_users()
+    if not data:
         return []
-
-    data = read_users().values()
     if limit:
-        return list(data)[:limit]
-    return list(data)
+        return list(data.values())[:limit]
+    return list(data.values())
 
 
 @router.get("/docs")

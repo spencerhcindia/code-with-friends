@@ -4,36 +4,42 @@ import uuid
 from pprint import pprint
 from fastapi import FastAPI, APIRouter, HTTPException
 
+# Create our in-memory DB and cursor
 db = sqlite3.connect("file::memory:?cache=shared", check_same_thread=False)
 cur = db.cursor()
 
-
+# Create your table SQL statement
 def createDB():
     cur.execute("CREATE TABLE users(id, name, address, email, phone)")
 
 
+# Create your table!
 createDB()
 
+# Instantiate our API/app
 app = FastAPI()
 router = APIRouter(prefix="/api")
 
-
+# Endpoint for adding a NEW user
 @router.post("/add/user")
 def add_user(name, address=None, email=None, phone=None) -> dict:
     id = insertUser(name, address, email, phone)
     return getUser(id)
 
 
+# Endpoint for getting ALL USERS
 @router.get("/get/all")
 def get_all_users(limit=10) -> list[dict]:
     return getAllUsers(limit)
 
 
+# Endpoint for GETTING an EXISTING USER
 @router.get("/get/user")
 def get_user(id) -> dict:
     return getUser(id)
 
 
+# Endpoint for UPDATING an EXISTING USER
 @router.patch("/update/user")
 def update_user(id, name=None, address=None, email=None, phone=None):
     user = getUser(id)
@@ -49,11 +55,13 @@ def update_user(id, name=None, address=None, email=None, phone=None):
         raise HTTPException(status_code=404, detail="No such user.")
 
 
+# Endpoint for DELETING a USER
 @router.delete("/delete/user")
 def delete_user(id) -> str:
     return deleteUser(id)
 
 
+# Method for CREATING a NEW USER
 def insertUser(name, address, email, phone) -> str:
     user_id = uuid.uuid4().hex
     params = (user_id, name, address, email, phone)
@@ -64,6 +72,7 @@ def insertUser(name, address, email, phone) -> str:
     return user_id
 
 
+# Method for GETTING ALL USERS
 def getAllUsers(limit=10) -> list[dict]:
     res = cur.execute("SELECT * FROM users LIMIT ?", (limit,))
     users = res.fetchall()
@@ -84,6 +93,7 @@ def getAllUsers(limit=10) -> list[dict]:
         return []
 
 
+# Method for GETTING an EXISTING USER
 def getUser(id) -> dict:
     res = cur.execute("SELECT * from users WHERE id = ?", (id,))
     user = res.fetchone()
@@ -102,6 +112,7 @@ def getUser(id) -> dict:
         return None
 
 
+# Method for UPDATING an EXISTING USER
 def updateUser(id, user_name, user_add, user_email, user_phone) -> dict:
 
     res = cur.execute(
@@ -113,12 +124,14 @@ def updateUser(id, user_name, user_add, user_email, user_phone) -> dict:
     return getUser(id)
 
 
+# Method for DELETING a USER
 def deleteUser(id) -> str:
     res = cur.execute("DELETE FROM users WHERE id = ?", (id,))
     db.commit()
     return f"User {id} deleted"
 
 
+# UNIT TESTS
 class MyTests(unittest.TestCase):
     def test_getUser(self):
         # Starting values for user
@@ -184,4 +197,5 @@ class MyTests(unittest.TestCase):
         assert len(users) == 2, "bad length"
 
 
+# App must INCLUDE all above ROUTER ENDPOINTS
 app.include_router(router=router)

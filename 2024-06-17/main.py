@@ -1,7 +1,6 @@
 import unittest
 import sqlite3
 import uuid
-from pprint import pprint
 from fastapi import FastAPI, APIRouter, HTTPException
 
 # Create our in-memory DB and cursor
@@ -20,49 +19,36 @@ createDB()
 app = FastAPI()
 router = APIRouter(prefix="/api")
 
-# Endpoint for adding a NEW user
+
 @router.post("/add/user")
 def add_user(name, address=None, email=None, phone=None) -> dict:
+    """Endpoint for creating a NEW user
+
+    Args:
+        name (str)
+        address (str, optional): Defaults to None.
+        email (str, optional): Defaults to None.
+        phone (str, optional): Defaults to None.
+
+    Returns:
+        dict
+    """
     id = insertUser(name, address, email, phone)
     return getUser(id)
 
 
-# Endpoint for getting ALL USERS
-@router.get("/get/all")
-def get_all_users(limit=10) -> list[dict]:
-    return getAllUsers(limit)
-
-
-# Endpoint for GETTING an EXISTING USER
-@router.get("/get/user")
-def get_user(id) -> dict:
-    return getUser(id)
-
-
-# Endpoint for UPDATING an EXISTING USER
-@router.patch("/update/user")
-def update_user(id, name=None, address=None, email=None, phone=None):
-    user = getUser(id)
-    if user:
-        return updateUser(
-            id,
-            user[id]["user_name"] if name is None else name,
-            user[id]["user_address"] if address is None else address,
-            user[id]["user_email"] if email is None else email,
-            user[id]["user_phone"] if phone is None else phone,
-        )
-    else:
-        raise HTTPException(status_code=404, detail="No such user.")
-
-
-# Endpoint for DELETING a USER
-@router.delete("/delete/user")
-def delete_user(id) -> str:
-    return deleteUser(id)
-
-
-# Method for CREATING a NEW USER
 def insertUser(name, address, email, phone) -> str:
+    """Method for CREATING a NEW USER
+
+    Args:
+        name (str)
+        address (str)
+        email (str)
+        phone (str)
+
+    Returns:
+        str: user_id
+    """
     user_id = uuid.uuid4().hex
     params = (user_id, name, address, email, phone)
     cur.execute(
@@ -72,8 +58,28 @@ def insertUser(name, address, email, phone) -> str:
     return user_id
 
 
-# Method for GETTING ALL USERS
+@router.get("/get/all")
+def get_all_users(limit=10) -> list[dict]:
+    """Endpoint for getting ALL USERS
+
+    Args:
+        limit (int, optional): Defaults to 10.
+
+    Returns:
+        list[dict]: each dict in list is one entire user "obj".
+    """
+    return getAllUsers(limit)
+
+
 def getAllUsers(limit=10) -> list[dict]:
+    """Method for GETTING ALL USERS
+
+    Args:
+        limit (int, optional): Defaults to 10.
+
+    Returns:
+        list[dict]: each dict in list is one entire user "obj".
+    """
     res = cur.execute("SELECT * FROM users LIMIT ?", (limit,))
     users = res.fetchall()
     if users is not None:
@@ -93,8 +99,28 @@ def getAllUsers(limit=10) -> list[dict]:
         return []
 
 
-# Method for GETTING an EXISTING USER
-def getUser(id) -> dict:
+@router.get("/get/user")
+def get_user(id) -> dict:
+    """Endpoint for GETTING an EXISTING USER
+
+    Args:
+        id (str)
+
+    Returns:
+        dict
+    """
+    return getUser(id)
+
+
+def getUser(id) -> dict | None:
+    """Method for GETTING an EXISTING USER
+
+    Args:
+        id (str)
+
+    Returns:
+        dict | None: return either dict or none.
+    """
     res = cur.execute("SELECT * from users WHERE id = ?", (id,))
     user = res.fetchone()
     if user is not None:
@@ -112,9 +138,49 @@ def getUser(id) -> dict:
         return None
 
 
-# Method for UPDATING an EXISTING USER
-def updateUser(id, user_name, user_add, user_email, user_phone) -> dict:
+@router.patch("/update/user")
+def update_user(id, name=None, address=None, email=None, phone=None) -> dict:
+    """Endpoint for UPDATING an EXISTING USER
 
+    Args:
+        id (str): _description_
+        name (str, optional): Defaults to None.
+        address (str, optional): Defaults to None.
+        email (str, optional): Defaults to None.
+        phone (str, optional): Defaults to None.
+
+    Raises:
+        HTTPException: If client attempts to update a user that doesn't exist they receive "No such user."
+
+    Returns:
+        dict: returns updated user.
+    """
+    user = getUser(id)
+    if user:
+        return updateUser(
+            id,
+            user[id]["user_name"] if name is None else name,
+            user[id]["user_address"] if address is None else address,
+            user[id]["user_email"] if email is None else email,
+            user[id]["user_phone"] if phone is None else phone,
+        )
+    else:
+        raise HTTPException(status_code=404, detail="No such user.")
+
+
+def updateUser(id, user_name, user_add, user_email, user_phone) -> dict:
+    """Method for UPDATING an EXISTING USER
+
+    Args:
+        id (str)
+        user_name (str)
+        user_add (str)
+        user_email (str)
+        user_phone (str)
+
+    Returns:
+        dict: returns updated user.
+    """
     res = cur.execute(
         "UPDATE users SET name = ?, email = ?, address = ?, phone = ? WHERE id = ?",
         (user_name, user_email, user_add, user_phone, id),
@@ -124,11 +190,34 @@ def updateUser(id, user_name, user_add, user_email, user_phone) -> dict:
     return getUser(id)
 
 
-# Method for DELETING a USER
+@router.delete("/delete/user")
+def delete_user(id) -> str:
+    """Endpoint for DELETING a USER
+
+    Args:
+        id (str)
+
+    Returns:
+        str: returns "User {user_id} deleted.".
+    """
+    return deleteUser(id)
+
+
 def deleteUser(id) -> str:
-    res = cur.execute("DELETE FROM users WHERE id = ?", (id,))
-    db.commit()
-    return f"User {id} deleted"
+    """Method for DELETING a USER
+
+    Args:
+        id (str)
+
+    Returns:
+        str: returns "User {user_id} deleted."
+    """
+    if getUser(id):
+        res = cur.execute("DELETE FROM users WHERE id = ?", (id,))
+        db.commit()
+        return f"User {id} deleted."
+    else:
+        return "No such user."
 
 
 # UNIT TESTS
@@ -140,8 +229,7 @@ class MyTests(unittest.TestCase):
         user_email = "email@test.clom"
         user_phone = "12345678"
 
-        # Create the DB
-        createDB()
+        # Insert lil test data
         user_id = insertUser(user_name, user_add, user_email, user_phone)
         user = getUser(user_id)
 
@@ -155,9 +243,7 @@ class MyTests(unittest.TestCase):
         assert user_name == chk_user_name, "test failed, username wrong"
         assert user_email == chk_user_email, "test failed, email wrong"
         assert user_add == chk_user_add, "test failed, address wrong"
-        assert (
-            user_phone == chk_user_phone
-        ), "test failed, phone wrong, but this time you are also GAY"
+        assert user_phone == chk_user_phone, "test failed, phone wrong"
 
         # Set new values for user
         new_name = "Tim"
@@ -178,16 +264,12 @@ class MyTests(unittest.TestCase):
         assert new_name == chk_new_name, "test failed, username wrong"
         assert new_email == chk_new_email, "test failed, email wrong"
         assert new_add == chk_new_add, "test failed, address wrong"
-        assert (
-            new_phone == chk_new_phone
-        ), "test failed, phone wrong, but this time you are also GAY"
+        assert new_phone == chk_new_phone, "test failed, phone wrong"
 
         deleteUser(user_id)
         result = getUser(user_id)
 
-        assert (
-            result == None
-        ), "you fucking suckm, pussy, your code doesn't get or delete or something, it/s all fucked honetsly -/ thend"
+        assert result == None, "test failed, user not deleted"
 
         insertUser("Sam", "home!", None, None)
         insertUser("Harrison", None, "email2test.com", None)
